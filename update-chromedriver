@@ -45,21 +45,17 @@ if [ ! -f /tmp/chromedriver.zip ]; then
 fi
 
 # Extract chromedriver
-unzip -d /tmp -o -j /tmp/chromedriver.zip "*/chromedriver"
-rm /tmp/chromedriver.zip
-ls -lh /tmp/chromedriver
-
-if [ ! -f /tmp/chromedriver ]; then
-    echo "Could not extract chromedriver binary"
-    exit 1
-fi
-
-# Move chromesriver over previous version
-target=`which chromedriver`
-if [ -z "$target" ]; then
+if which chromedriver; then
+    target_dir=$(dirname $(which chromedriver))
+else
     echo "Could not find CURRENT chromedriver binary"
-    echo "New version is available at /tmp/chromedriver"
+    echo "New version will be put to /tmp/chromedriver"
+    target_dir=/tmp
+fi
+if unzip -d "$target_dir" -o -j /tmp/chromedriver.zip "*/chromedriver" ; then
+    rm /tmp/chromedriver.zip
+    ls -lh "$target_dir/chromedriver"
+else
+    echo Cannot unzip. Archive is /tmp/chromedriver.zip
     exit 1
 fi
-
-mv -vf /tmp/chromedriver "$target"
