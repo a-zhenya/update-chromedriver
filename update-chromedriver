@@ -5,7 +5,17 @@ version="$1"
 if [ -z "$version" ]; then
     version=$(google-chrome --version | cut -d ' ' -f 3)
 fi
-echo version=$version
+echo chrome version=$version
+
+if which chromedriver; then
+    driver_version=$(chromedriver --version | cut -d ' ' -f 2)
+    if [ "$version" = "$driver_version" ]; then
+        echo Already installed driver $driver_version
+        exit 0
+    else
+	echo Current driver $driver_version. Replacing
+    fi
+fi
 
 api="https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json"
 
