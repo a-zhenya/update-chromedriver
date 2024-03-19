@@ -1,0 +1,65 @@
+#!/bin/sh
+
+# Get the latest version of chrome
+version="$1"
+if [ -z "$version" ]; then
+    version=$(google-chrome --version | cut -d ' ' -f 3)
+fi
+echo chrome version=$version
+
+if which chromedriver; then
+    driver_version=$(chromedriver --version | cut -d ' ' -f 2)
+    if [ "$version" = "$driver_version" ]; then
+        echo Already installed driver $driver_version
+        exit 0
+    else
+	if [ -z "$1" ]; then
+	    echo Current driver $driver_version. Replacing
+	else
+	    echo Current driver $driver_version. Checking if an update available
+        fi
+    fi
+fi
+
+api="https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json"
+
+# Get the url of corresponding chromedriver
+url=$(
+    curl -s "$api" |
+    jq -r ".versions[] | select(.version==\"$version\").downloads.chromedriver[] | select(.platform==\"linux64\").url"
+)
+echo url=$url
+
+if [ -z "$url" ]; then
+    echo "Could not find url for downloadable chromedriver"
+    exit 1
+fi
+
+if [ -n "$1" ]; then
+    echo "Found downloadable chromedriver $version"
+    exit 0
+fi
+
+# Download chromedriver
+curl -sL -o /tmp/chromedriver.zip "$url"
+
+if [ ! -f /tmp/chromedriver.zip ]; then
+    echo "Could not download chromedriver"
+    exit 1
+fi
+
+# Extract chromedriver
+if which chromedriver; then
+    target_dir=$(dirname $(which chromedriver))
+else
+    echo "Could not find CURRENT chromedriver binary"
+    echo "New version will be put to /tmp/chromedriver"
+    target_dir=/tmp
+fi
+if unzip -d "$target_dir" -o -j /tmp/chromedriver.zip "*/chromedriver" ; then
+    rm /tmp/chromedriver.zip
+    ls -lh "$target_dir/chromedriver"
+else
+    echo Cannot unzip. Archive is /tmp/chromedriver.zip
+    exit 1
+fi
