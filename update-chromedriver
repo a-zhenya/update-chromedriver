@@ -13,7 +13,11 @@ if which chromedriver; then
         echo Already installed driver $driver_version
         exit 0
     else
-	echo Current driver $driver_version. Replacing
+	if [ -z "$1" ]; then
+	    echo Current driver $driver_version. Replacing
+	else
+	    echo Current driver $driver_version. Checking if an update available
+        fi
     fi
 fi
 
