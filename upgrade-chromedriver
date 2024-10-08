@@ -4,8 +4,23 @@
 version="$1"
 if [ -z "$version" ]; then
     version=$(google-chrome --version | cut -d ' ' -f 3)
+    version_source="installed google-chrome"
+    dry=0
+elif [ "$version" = "--apt" ]; then
+    version=$(apt-get --just-print upgrade |
+        grep "Conf google-chrome-stable" |
+        grep -Eo '[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+')
+    if [ -z "$version" ]; then
+        echo Cannot find the upgradable google-chrome-stable
+        exit 1
+    fi
+    version_source="apt-cache"
+    dry=yes
+else
+    version_source="command line"
+    dry=yes
 fi
-echo chrome version=$version
+echo chrome version=$version, $version_source
 
 if which chromedriver; then
     driver_version=$(chromedriver --version | cut -d ' ' -f 2)
@@ -13,10 +28,10 @@ if which chromedriver; then
         echo Already installed driver $driver_version
         exit 0
     else
-	if [ -z "$1" ]; then
-	    echo Current driver $driver_version. Replacing
-	else
-	    echo Current driver $driver_version. Checking if an update available
+        if [ "$dry" = yes ]; then
+            echo Current driver $driver_version. Checking if an update available
+        else
+            echo Current driver $driver_version. Replacing
         fi
     fi
 fi
@@ -35,7 +50,7 @@ if [ -z "$url" ]; then
     exit 1
 fi
 
-if [ -n "$1" ]; then
+if [ "$dry" = yes ]; then
     echo "Found downloadable chromedriver $version"
     exit 0
 fi
