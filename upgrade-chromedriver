@@ -12,7 +12,7 @@ elif [ "$version" = "--apt" ]; then
         grep -Eo '[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+')
     if [ -z "$version" ]; then
         echo Cannot find the upgradable google-chrome-stable
-        exit 1
+        exit 0
     fi
     version_source="apt-cache"
     dry=yes
