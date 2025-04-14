@@ -29,7 +29,7 @@ if which chromedriver; then
         exit 0
     else
         if [ "$dry" = yes ]; then
-            echo Current driver $driver_version. Checking if an update available
+            echo Driver $driver_version. Checking if an update available
         else
             echo Current driver $driver_version. Replacing
         fi
@@ -41,7 +41,7 @@ api="https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-w
 # Get the url of corresponding chromedriver
 url=$(
     curl -s "$api" |
-    jq -r ".versions[] | select(.version==\"$version\").downloads.chromedriver[] | select(.platform==\"linux64\").url"
+    jq -r --arg VERSION "$version" '.versions[] | select(.version==$VERSION).downloads.chromedriver[] | select(.platform=="linux64").url'
 )
 echo url=$url
 
