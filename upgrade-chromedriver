@@ -1,5 +1,12 @@
 #!/bin/sh
 
+TMPDIR=/tmp
+DIR_IF_NO_CURRENT="$HOME/.local/bin"
+if [ ! -d "$DIR_IF_NO_CURRENT" ]; then
+    DIR_IF_NO_CURRENT="$TMPDIR"
+fi
+LEAVE_ZIP_IF_NOT_SUCCESSFUL=y
+
 # Get the latest version of chrome
 version="$1"
 if [ -z "$version" ]; then
@@ -56,9 +63,10 @@ if [ "$dry" = yes ]; then
 fi
 
 # Download chromedriver
-curl -sL -o /tmp/chromedriver.zip "$url"
+ZIP_PATH=${TMPDIR}/chromedriver.zip
+curl -sL -o "$ZIP_PATH" "$url"
 
-if [ ! -f /tmp/chromedriver.zip ]; then
+if [ ! -f "$ZIP_PATH" ]; then
     echo "Could not download chromedriver"
     exit 1
 fi
@@ -68,13 +76,18 @@ if which chromedriver; then
     target_dir=$(dirname $(which chromedriver))
 else
     echo "Could not find CURRENT chromedriver binary"
-    echo "New version will be put to /tmp/chromedriver"
-    target_dir=/tmp
+    echo "New version will be put to $DIR_IF_NO_CURRENT/chromedriver"
+    target_dir="$DIR_IF_NO_CURRENT"
 fi
-if unzip -d "$target_dir" -o -j /tmp/chromedriver.zip "*/chromedriver" ; then
-    rm /tmp/chromedriver.zip
+if unzip -d "$target_dir" -o -j "$ZIP_PATH" "*/chromedriver" ; then
+    rm "$ZIP_PATH"
     ls -lh "$target_dir/chromedriver"
 else
-    echo Cannot unzip. Archive is /tmp/chromedriver.zip
+    if [ -z "$LEAVE_ZIP_IF_NOT_SUCCESSFUL" -o "$LEAVE_ZIP_IF_NOT_SUCCESSFUL" = 0 ]; then
+    	echo Cannot unzip
+	rm "$ZIP_PATH"
+    else
+    	echo Cannot unzip. Leaving the archive here: "$ZIP_PATH"
+    fi
     exit 1
 fi
