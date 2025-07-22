@@ -1,6 +1,7 @@
 #!/bin/sh
 
 TMPDIR=/tmp
+DRY=0
 DIR_IF_NO_CURRENT="$HOME/.local/bin"
 if [ ! -d "$DIR_IF_NO_CURRENT" ]; then
     DIR_IF_NO_CURRENT="$TMPDIR"
@@ -12,7 +13,6 @@ version="$1"
 if [ -z "$version" ]; then
     version=$(google-chrome --version | cut -d ' ' -f 3)
     version_source="installed google-chrome"
-    dry=0
 elif [ "$version" = "--apt" ]; then
     version=$(apt-get --just-print upgrade |
         grep "Conf google-chrome-stable" |
@@ -22,10 +22,10 @@ elif [ "$version" = "--apt" ]; then
         exit 0
     fi
     version_source="apt-cache"
-    dry=yes
+    DRY=1
 else
     version_source="command line"
-    dry=yes
+    DRY=1
 fi
 echo chrome version=$version, $version_source
 
@@ -35,7 +35,7 @@ if which chromedriver; then
         echo Already installed driver $driver_version
         exit 0
     else
-        if [ "$dry" = yes ]; then
+        if [ "$DRY" = 1 ]; then
             echo Driver $driver_version. Checking if an update available
         else
             echo Current driver $driver_version. Replacing
@@ -48,7 +48,8 @@ api="https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-w
 # Get the url of corresponding chromedriver
 url=$(
     curl -s "$api" |
-    jq -r --arg VERSION "$version" '.versions[] | select(.version==$VERSION).downloads.chromedriver[] | select(.platform=="linux64").url'
+    jq -r --arg PLATFORM "linux64" --arg VERSION "$version" \
+    	'.versions[] | select(.version==$VERSION).downloads.chromedriver[] | select(.platform==$PLATFORM).url'
 )
 echo url=$url
 
@@ -57,7 +58,7 @@ if [ -z "$url" ]; then
     exit 1
 fi
 
-if [ "$dry" = yes ]; then
+if [ "$DRY" = 1 ]; then
     echo "Found downloadable chromedriver $version"
     exit 0
 fi
