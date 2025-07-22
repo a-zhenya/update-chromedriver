@@ -1,93 +1,164 @@
 #!/bin/sh
 
-TMPDIR=/tmp
-DIR_IF_NO_CURRENT="$HOME/.local/bin"
-if [ ! -d "$DIR_IF_NO_CURRENT" ]; then
-    DIR_IF_NO_CURRENT="$TMPDIR"
-fi
-LEAVE_ZIP_IF_NOT_SUCCESSFUL=y
+set -e
 
-# Get the latest version of chrome
-version="$1"
-if [ -z "$version" ]; then
-    version=$(google-chrome --version | cut -d ' ' -f 3)
-    version_source="installed google-chrome"
-    dry=0
-elif [ "$version" = "--apt" ]; then
-    version=$(apt-get --just-print upgrade |
-        grep "Conf google-chrome-stable" |
-        grep -Eo '[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+')
-    if [ -z "$version" ]; then
-        echo Cannot find the upgradable google-chrome-stable
+TMPDIR="/tmp"
+DEFAULT_TARGET_DIR="$HOME/.local/bin"
+DRY=0
+DOWNLOAD_ONLY=0
+TARGET_DIR=""
+CHROME_VERSION=""
+USE_APT=0
+LEAVE_ZIP_ON_FAILURE=0
+
+usage() {
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  --dry                     Only check if an update is needed, do not install"
+    echo "  --download-only           Download the archive but do not install"
+    echo "  --leave-zip-on-failure    Do not delete ZIP if install fails"
+    echo "  --target-dir DIR          Where to install chromedriver"
+    echo "  --version VERSION         Use this Chrome version (implies --dry)"
+    echo "  --apt                     Use version from apt (implies --dry)"
+    echo "  -h, --help                Show this help"
+    exit 1
+}
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --dry)
+            DRY=1
+            ;;
+        --download-only)
+            DOWNLOAD_ONLY=1
+            ;;
+        --leave-zip-on-failure)
+            LEAVE_ZIP_ON_FAILURE=1
+            ;;
+        --target-dir)
+            shift
+            TARGET_DIR="$1"
+            ;;
+        --version)
+            shift
+            CHROME_VERSION="$1"
+            DRY=1
+            ;;
+        --apt)
+            USE_APT=1
+            DRY=1
+            ;;
+        -h|--help)
+            usage
+            ;;
+        *)
+            echo "Unknown option: $1"
+            usage
+            ;;
+    esac
+    shift
+done
+
+# Determine Chrome version
+if [ "$USE_APT" = 1 ]; then
+    CHROME_VERSION=$(apt-get --just-print upgrade | grep "Conf google-chrome-stable" || [ $? -eq 1 ])
+    if [ -z "$CHROME_VERSION" ]; then
+        echo "Cannot find the upgradable google-chrome-stable"
         exit 0
     fi
-    version_source="apt-cache"
-    dry=yes
+    CHROME_VERSION=$(echo $CHROME_VERSION | grep -Eo '[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+')
+    version_source="APT cache"
+elif [ -z "$CHROME_VERSION" ]; then
+    CHROME_VERSION=$(google-chrome --version | cut -d ' ' -f 3)
+    version_source="Installed Chrome"
 else
-    version_source="command line"
-    dry=yes
+    version_source="Command line"
 fi
-echo chrome version=$version, $version_source
 
-if which chromedriver; then
-    driver_version=$(chromedriver --version | cut -d ' ' -f 2)
-    if [ "$version" = "$driver_version" ]; then
-        echo Already installed driver $driver_version
+echo "Chrome version = $CHROME_VERSION ($version_source)"
+
+# Check existing chromedriver
+if which chromedriver >/dev/null 2>&1; then
+    INSTALLED_VERSION=$(chromedriver --version | cut -d ' ' -f 2)
+    if [ "$CHROME_VERSION" = "$INSTALLED_VERSION" ]; then
+        echo "Chromedriver $INSTALLED_VERSION already installed"
         exit 0
     else
-        if [ "$dry" = yes ]; then
-            echo Driver $driver_version. Checking if an update available
+        if [ "$DRY" = 1 ]; then
+            echo Driver $INSTALLED_VERSION. Checking if an update available
         else
-            echo Current driver $driver_version. Replacing
+            echo Current driver $INSTALLED_VERSION. Replacing
         fi
     fi
 fi
 
-api="https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json"
+# Get download URL
+API="https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json"
+URL=$(curl -s "$API" |
+    jq -r --arg PLATFORM "linux64" --arg VERSION "$CHROME_VERSION" \
+        '.versions[] | select(.version==$VERSION).downloads.chromedriver[] | select(.platform==$PLATFORM).url')
 
-# Get the url of corresponding chromedriver
-url=$(
-    curl -s "$api" |
-    jq -r --arg VERSION "$version" '.versions[] | select(.version==$VERSION).downloads.chromedriver[] | select(.platform=="linux64").url'
-)
-echo url=$url
-
-if [ -z "$url" ]; then
-    echo "Could not find url for downloadable chromedriver"
+if [ -z "$URL" ]; then
+    echo "Could not find downloadable chromedriver $CHROME_VERSION"
     exit 1
 fi
 
-if [ "$dry" = yes ]; then
-    echo "Found downloadable chromedriver $version"
+echo "Download URL: $URL"
+
+if [ "$DRY" = 1 ]; then
+    echo "Found downloadable chromedriver $CHROME_VERSION"
     exit 0
 fi
 
-# Download chromedriver
-ZIP_PATH=${TMPDIR}/chromedriver.zip
-curl -sL -o "$ZIP_PATH" "$url"
+ZIP_PATH="${TMPDIR}/chromedriver.zip"
+echo "Downloading chromedriver to $ZIP_PATH..."
+set +e
+curl -sL -o "$ZIP_PATH" "$URL"
+curl_status=$?
+set -e
 
-if [ ! -f "$ZIP_PATH" ]; then
-    echo "Could not download chromedriver"
+if [ $curl_status -ne 0 ] || [ ! -f "$ZIP_PATH" ]; then
+    echo "Failed to download chromedriver"
     exit 1
 fi
 
-# Extract chromedriver
-if which chromedriver; then
-    target_dir=$(dirname $(which chromedriver))
-else
-    echo "Could not find CURRENT chromedriver binary"
-    echo "New version will be put to $DIR_IF_NO_CURRENT/chromedriver"
-    target_dir="$DIR_IF_NO_CURRENT"
+echo "Download complete: $ZIP_PATH"
+
+if [ "$DOWNLOAD_ONLY" = 1 ]; then
+    exit 0
 fi
-if unzip -d "$target_dir" -o -j "$ZIP_PATH" "*/chromedriver" ; then
-    rm "$ZIP_PATH"
-    ls -lh "$target_dir/chromedriver"
-else
-    if [ -z "$LEAVE_ZIP_IF_NOT_SUCCESSFUL" -o "$LEAVE_ZIP_IF_NOT_SUCCESSFUL" = 0 ]; then
-    	echo Cannot unzip
-	rm "$ZIP_PATH"
+
+if [ -z "$TARGET_DIR" ]; then
+    if which chromedriver >/dev/null 2>&1; then
+        TARGET_DIR=$(dirname "$(which chromedriver)")
     else
-    	echo Cannot unzip. Leaving the archive here: "$ZIP_PATH"
+        if [ -d "$DEFAULT_TARGET_DIR" ]; then
+        TARGET_DIR="$DEFAULT_TARGET_DIR"
+        else
+            TARGET_DIR="$TMPDIR"
+        fi
+        echo "No current chromedriver found. Installing to $TARGET_DIR"
+    fi
+fi
+
+# Extract chromedriver
+echo "Installing chromedriver to $TARGET_DIR..."
+set +e
+unzip -d "$TARGET_DIR" -o -j "$ZIP_PATH" "*/chromedriver" >/dev/null
+unzip_status=$?
+set -e
+
+if [ $unzip_status -eq 0 ]; then
+    echo "Installed to $TARGET_DIR/chromedriver"
+    rm "$ZIP_PATH"
+    ls -lh "$TARGET_DIR/chromedriver"
+else
+    echo "Failed to extract chromedriver"
+    if [ "$LEAVE_ZIP_ON_FAILURE" = 1 ]; then
+        echo "Leaving ZIP archive at $ZIP_PATH"
+    else
+        rm "$ZIP_PATH"
     fi
     exit 1
 fi
