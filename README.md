@@ -8,7 +8,8 @@ Usage:
 | Running                       | Result                        |
 | ----------------------------- | ----------------------------- |
 | `upgrade-chromedriver`        | Check current version of google-chrome and download the matching driver |
-| `upgrade-chromedriver VERSION` | Check if the driver with the specific version is available |
+| `upgrade-chromedriver --version VERSION` | Check if the driver with the specific version is available |
 | `upgrade-chromedriver --apt`  | Check if the driver matching the chrome version to upgrade to is available |
 
-API endpoint in use: https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json
+API endpoint in use:<br>
+https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json
