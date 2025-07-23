@@ -19,7 +19,7 @@ usage() {
     echo "  --download-only           Download the archive but do not install"
     echo "  --leave-zip-on-failure    Do not delete ZIP if install fails"
     echo "  --target-dir DIR          Where to install chromedriver"
-    echo "  --version VERSION         Use this Chrome version"
+    echo "  --version VERSION         Use this Chrome version (implies --dry)"
     echo "  --apt                     Use version from apt (implies --dry)"
     echo "  -h, --help                Show this help"
     exit 1
@@ -111,7 +111,7 @@ if [ "$DRY" = 1 ]; then
     exit 0
 fi
 
-ZIP_PATH="${TMPDIR}/chromedriver-${CHROME_VERSION}.zip"
+ZIP_PATH="${TMPDIR}/chromedriver.zip"
 echo "Downloading chromedriver to $ZIP_PATH..."
 set +e
 curl -sL -o "$ZIP_PATH" "$URL"
