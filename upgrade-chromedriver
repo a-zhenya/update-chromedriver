@@ -87,17 +87,6 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-TOOLS_MISSING=0
-for tool in curl jq unzip; do
-    if ! command -v "$tool" >/dev/null 2>&1; then
-        echo "Error: Required tool '$tool' is not installed"
-        TOOLS_MISSING=1
-    fi
-done
-if [ "$TOOLS_MISSING" = 1 ]; then
-    exit 1
-fi
-
 # Determine Chrome version
 if [ "$USE_APT" = 1 ]; then
     CHROME_VERSION=$(apt-get --just-print upgrade | grep "Conf google-chrome-stable" || [ $? -eq 1 ])
@@ -129,6 +118,17 @@ if [ "$FORCE" != 1 ] && command -v chromedriver >/dev/null 2>&1; then
             echo "Current driver $INSTALLED_VERSION. Replacing"
         fi
     fi
+fi
+
+TOOLS_MISSING=0
+for tool in curl jq unzip; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+        echo "Error: Required tool '$tool' is not installed"
+        TOOLS_MISSING=1
+    fi
+done
+if [ "$TOOLS_MISSING" = 1 ]; then
+    exit 1
 fi
 
 # Get download URL
