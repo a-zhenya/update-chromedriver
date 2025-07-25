@@ -24,6 +24,16 @@ Additional keys:
 | `--force`                | Always download |
 | `--help`                 | Show usage info |
 
+# Installation
+```
+curl -L -o update-chromedriver.zip \
+    "$(curl -s https://api.github.com/repos/a-zhenya/update-chromedriver/releases/latest | jq -r .zipball_url)"
+unzip -j -d $HOME/.local/bin/ update-chromedriver.zip "*/upgrade-chromedriver"
+chmod +x $HOME/.local/bin/upgrade-chromedriver
+rm -v update-chromedriver.zip
+```
+
+# Technical Details
 API endpoint in use:<br>
 https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json
 
