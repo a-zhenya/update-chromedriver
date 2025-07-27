@@ -98,6 +98,10 @@ if [ "$USE_APT" = 1 ]; then
     version_source="APT cache"
 elif [ -z "$CHROME_VERSION" ]; then
     CHROME_VERSION=$(google-chrome --version | cut -d ' ' -f 3)
+    if [ -z "$CHROME_VERSION" ]; then
+        echo "Google Chrome is not installed or not found in PATH"
+        exit 1
+    fi
     version_source="Installed Chrome"
 else
     version_source="Command line"
@@ -188,6 +192,7 @@ echo "Installing chromedriver to $TARGET_DIR..."
 
 if unzip -d "$TARGET_DIR" -o -j "$ZIP_PATH" "*/chromedriver" >/dev/null; then
     rm "$ZIP_PATH"
+    chmod +x "$TARGET_DIR/chromedriver"
     ls -lh "$TARGET_DIR/chromedriver"
     echo "chromedriver $CHROME_VERSION installed to $TARGET_DIR/chromedriver"
 else

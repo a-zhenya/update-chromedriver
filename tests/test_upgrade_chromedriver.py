@@ -123,7 +123,8 @@ def run_upgrade(
 
 def test_new_driver(tmp_path):  # no chromedriver before
     res, bindir, homedir = run_upgrade(chromedriver=False, wrkdir=tmp_path)
-    assert (homedir / ".local" / "bin" / "chromedriver").exists(), "Xxxx\n" + res.stdout
+    assert (homedir / ".local" / "bin" / "chromedriver").exists()
+    assert os.access(homedir / ".local" / "bin" / "chromedriver", os.X_OK)
     assert res.returncode == 0
 
 
@@ -131,6 +132,7 @@ def test_replace_driver(tmp_path):  # default upgrade
     res, bindir, homedir = run_upgrade(wrkdir=tmp_path)
     assert res.returncode == 0
     assert (bindir / "chromedriver").exists()
+    assert os.access(bindir / "chromedriver", os.X_OK)
     assert NEW_VERSION in (bindir / "chromedriver").read_text()
 
 
@@ -145,6 +147,7 @@ def test_target_dir_change(tmp_path):  # custom target
     tgt_dir.mkdir()
     res, bindir, homedir = run_upgrade(args=["--target-dir", str(tgt_dir)], chromedriver=False, wrkdir=tmp_path)
     assert (tgt_dir / "chromedriver").exists()
+    assert os.access(tgt_dir / "chromedriver", os.X_OK)
     assert res.returncode == 0
 
 
@@ -218,6 +221,12 @@ def test_unzip_fail(tmp_path):
     res, bindir, homedir = run_upgrade(unzip_success=False, chromedriver=False, wrkdir=tmp_path)
     assert res.returncode != 0
     assert "Failed to extract" in res.stdout
+
+
+def test_no_chrome(tmp_path):
+    res, bindir, homedir = run_upgrade(update_found=False, chrome=False, wrkdir=tmp_path)
+    assert res.returncode != 0
+    assert "Google Chrome is not installed" in res.stdout
 
 
 def test_no_driver_version_available(tmp_path):
