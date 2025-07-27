@@ -36,9 +36,7 @@ fi
 
 
 def install_jq(success, path):
-
-    script = (
-        """#!/bin/bash
+    script = """#!/bin/bash
 while [ $# -gt 0 ]; do
     if [ "$1" = "PLATFORM" ]; then shift; PLATFORM="$1"; fi
     if [ "$1" = "VERSION" ]; then shift; VERSION="$1"; fi
@@ -46,7 +44,6 @@ while [ $# -gt 0 ]; do
 done
 echo http://example.com/downloads/$VERSION/$PLATFORM/chromedriver.zip
 """
-    )
     (path / "jq").write_text(script if success else "")
     (path / "jq").chmod(0o755)
 
@@ -124,6 +121,12 @@ def run_upgrade(
 # === POSITIVE PATHS ===
 
 
+def test_new_driver(tmp_path):  # no chromedriver before
+    res, bindir, homedir = run_upgrade(chromedriver=False, wrkdir=tmp_path)
+    assert (homedir / ".local" / "bin" / "chromedriver").exists(), "Xxxx\n" + res.stdout
+    assert res.returncode == 0
+
+
 def test_replace_driver(tmp_path):  # default upgrade
     res, bindir, homedir = run_upgrade(wrkdir=tmp_path)
     assert res.returncode == 0
@@ -134,12 +137,6 @@ def test_replace_driver(tmp_path):  # default upgrade
 def test_driver_already_up_to_date(tmp_path):  # no need to upgrade
     res, bindir, homedir = run_upgrade(chromedriver=NEW_VERSION, wrkdir=tmp_path, tools=False)
     assert "already installed" in res.stdout
-    assert res.returncode == 0
-
-
-def test_new_driver(tmp_path):  # no chromedriver before
-    res, bindir, homedir = run_upgrade(chromedriver=False, wrkdir=tmp_path)
-    assert (homedir / ".local" / "bin" / "chromedriver").exists(), "Xxxx\n" + res.stdout
     assert res.returncode == 0
 
 
@@ -160,7 +157,7 @@ def test_dry_run(tmp_path):  # dry
 
 def test_force_install(tmp_path):  # force reinstall
     res, bindir, homedir = run_upgrade(args=["--force"], wrkdir=tmp_path)
-    assert "example.com" in (bindir / "chromedriver").read_text() # Ensure downloading happened
+    assert "example.com" in (bindir / "chromedriver").read_text()  # Ensure downloading happened
     assert res.returncode == 0
 
 
@@ -242,7 +239,8 @@ def test_download_only(tmp_path):
     dl_dir.mkdir()
     res, bindir, homedir = run_upgrade(
         args=["--download-only", "--target-dir", str(tgt_dir), "--download-dir", str(dl_dir)],
-        chromedriver=False, wrkdir=tmp_path,
+        chromedriver=False,
+        wrkdir=tmp_path,
     )
     assert res.returncode == 0
     assert not (tgt_dir / "chromedriver").exists()
