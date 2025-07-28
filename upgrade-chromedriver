@@ -31,7 +31,7 @@ Options:
                             Variants: linux64, mac-arm64, mac-x64, win32, win64
   -f, --force               Always download
   --version                 Print version and exit
-  --self-update             Update this script to the latest version
+  --self-update             Update this script to the latest release
   -h, --help                Show this help
 EOF
     exit 1
@@ -80,10 +80,10 @@ while [ $# -gt 0 ]; do
             ZIP_FILE=$(mktemp /tmp/update-chromedriver-XXXXXX.zip)
             curl -L -o "$ZIP_FILE" \
                 "$(curl -s https://api.github.com/repos/a-zhenya/update-chromedriver/releases/latest | jq -r .zipball_url)"
-            unzip -j -d $(dirname "$0") "$ZIP_FILE" "*/upgrade-chromedriver"
+            unzip -j -f -o -d $(dirname "$0") "$ZIP_FILE" "*/upgrade-chromedriver"
             chmod +x "$0"
             rm -v "$ZIP_FILE"
-            echo "Self-update complete. Please run the script again."
+            echo "Self-update complete"
             exit 0
             ;;
         --version)
