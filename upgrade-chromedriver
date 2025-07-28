@@ -2,6 +2,7 @@
 
 set -ue
 
+VERSION="1.3"
 DOWNLOAD_DIR="/tmp"
 DEFAULT_TARGET_DIR="$HOME/.local/bin"
 DRY=0
@@ -15,19 +16,22 @@ FORCE=0
 
 usage() {
     cat <<EOF
-Usage: $(basename $0) [OPTIONS]
+Usage: $(basename "$0") [OPTIONS]
 
 Options:
-  --dry                     Only check if an update is needed, do not install
+  --dry                     Check if an update is needed, do not install
   --download-only           Download the archive but do not install
   --leave-zip-on-failure    Do not delete archive if install fails
   -t, --target-dir DIR      Where to install chromedriver
   -d, --download-dir DIR    Where to download archive
-  -v, --version VERSION     Use this Chrome version (implies --dry). Can be specified without key
+  --chrome VERSION          Use this Chrome version (implies --dry). Can be specified without --chrome
+                            If not specified, will use the version from installed Chrome
   --apt                     Use version from apt (implies --dry)
   --platform PLATFORM       Specify platform (default = linux64, the key implies --download-only)
                             Variants: linux64, mac-arm64, mac-x64, win32, win64
   -f, --force               Always download
+  --version                 Print version and exit
+  --self-update             Update this script to the latest version
   -h, --help                Show this help
 EOF
     exit 1
@@ -54,7 +58,7 @@ while [ $# -gt 0 ]; do
             shift
             DOWNLOAD_DIR="$1"
             ;;
-        -v|--version)
+        --chrome)
             shift
             CHROME_VERSION="$1"
             DRY=1
@@ -71,6 +75,20 @@ while [ $# -gt 0 ]; do
         --apt)
             USE_APT=1
             DRY=1
+            ;;
+        --self-update)
+            ZIP_FILE=$(mktemp /tmp/update-chromedriver-XXXXXX.zip)
+            curl -L -o "$ZIP_FILE" \
+                "$(curl -s https://api.github.com/repos/a-zhenya/update-chromedriver/releases/latest | jq -r .zipball_url)"
+            unzip -j -d $(dirname "$0") "$ZIP_FILE" "*/upgrade-chromedriver"
+            chmod +x "$0"
+            rm -v "$ZIP_FILE"
+            echo "Self-update complete. Please run the script again."
+            exit 0
+            ;;
+        --version)
+            echo "upgrade-chromedriver version $VERSION"
+            exit 0
             ;;
         -h|--help)
             usage
@@ -91,7 +109,7 @@ done
 if [ "$USE_APT" = 1 ]; then
     CHROME_VERSION=$(apt-get --just-print upgrade | grep "Conf google-chrome-stable" || [ $? -eq 1 ])
     if [ -z "$CHROME_VERSION" ]; then
-        echo "Cannot find the upgradable google-chrome-stable"
+        echo "No upgradable google-chrome-stable"
         exit 0
     fi
     CHROME_VERSION=$(echo $CHROME_VERSION | grep -Eo '[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+')

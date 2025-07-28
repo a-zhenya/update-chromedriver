@@ -185,7 +185,7 @@ def test_platform_specified(tmp_path):  # platform specified
 
 
 def test_cli_version(tmp_path):  # -v version
-    res, bindir, homedir = run_upgrade(args=["-v", NEW_VERSION], chrome=False, chromedriver=False, wrkdir=tmp_path)
+    res, bindir, homedir = run_upgrade(args=["--chrome", NEW_VERSION], chrome=False, chromedriver=False, wrkdir=tmp_path)
     assert "Found downloadable chromedriver" in res.stdout
     assert "Command line" in res.stdout
 
@@ -237,7 +237,7 @@ def test_no_driver_version_available(tmp_path):
 
 def test_apt_version_not_found(tmp_path):
     res, bindir, homedir = run_upgrade(args=["--apt"], apt_version=None, chromedriver=False, wrkdir=tmp_path)
-    assert "Cannot find the upgradable" in res.stdout
+    assert "No upgradable google-chrome-stable" in res.stdout
     assert res.returncode == 0
 
 
