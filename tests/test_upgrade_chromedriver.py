@@ -17,8 +17,7 @@ def install_chromedriver(version, path):
 
 
 def install_curl(success, path):
-    script = (
-        """#!/bin/bash
+    script = """#!/bin/bash
 while [ $# -gt 0 ]; do
     if [ "$1" = "-o" ]; then shift; FILE="$1"; fi
     URL="$1" # URL is the last argument
@@ -28,10 +27,7 @@ if [ -n "$FILE" ]; then
     echo $URL > "$FILE"
 fi
 """
-        if success
-        else "#!/bin/bash\nexit 1\n"
-    )
-    (path / "curl").write_text(script)
+    (path / "curl").write_text(script if success else "#!/bin/bash\nexit 1\n")
     (path / "curl").chmod(0o755)
 
 
@@ -49,8 +45,7 @@ echo http://example.com/downloads/$VERSION/$PLATFORM/chromedriver.zip
 
 
 def install_unzip(success, path):
-    script = (
-        """#!/bin/bash
+    script = """#!/bin/bash
 ZIP=""
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -71,10 +66,7 @@ while [ $# -gt 0 ]; do
 done
 cat "$ZIP" > "$DIR/chromedriver"
 """
-        if success
-        else "#!/bin/bash\nexit 1\n"
-    )
-    (path / "unzip").write_text(script)
+    (path / "unzip").write_text(script if success else "#!/bin/bash\nexit 1\n")
     (path / "unzip").chmod(0o755)
 
 
@@ -136,13 +128,13 @@ def test_replace_driver(tmp_path):  # default upgrade
     assert NEW_VERSION in (bindir / "chromedriver").read_text()
 
 
-def test_driver_already_up_to_date(tmp_path):  # no need to upgrade
+def test_driver_already_up_to_date(tmp_path):
     res, bindir, homedir = run_upgrade(chromedriver=NEW_VERSION, wrkdir=tmp_path, tools=False)
     assert "already installed" in res.stdout
     assert res.returncode == 0
 
 
-def test_target_dir_change(tmp_path):  # custom target
+def test_target_dir_change(tmp_path):
     tgt_dir = tmp_path / "target"
     tgt_dir.mkdir()
     res, bindir, homedir = run_upgrade(args=["--target-dir", str(tgt_dir)], chromedriver=False, wrkdir=tmp_path)
@@ -151,7 +143,7 @@ def test_target_dir_change(tmp_path):  # custom target
     assert res.returncode == 0
 
 
-def test_dry_run(tmp_path):  # dry
+def test_dry_run(tmp_path):
     res, bindir, homedir = run_upgrade(args=["--dry"], wrkdir=tmp_path)
     assert "Found downloadable chromedriver" in res.stdout
     assert OLD_VERSION in (bindir / "chromedriver").read_text()
@@ -164,7 +156,7 @@ def test_force_install(tmp_path):  # force reinstall
     assert res.returncode == 0
 
 
-def test_download_dir_change(tmp_path):  # custom download dir
+def test_download_dir_change(tmp_path):
     dl_dir = tmp_path / "downloads"
     dl_dir.mkdir()
     res, bindir, homedir = run_upgrade(
@@ -177,20 +169,20 @@ def test_download_dir_change(tmp_path):  # custom download dir
     assert res.returncode == 1
 
 
-def test_platform_specified(tmp_path):  # platform specified
+def test_platform_specified(tmp_path):
     res, bindir, homedir = run_upgrade(args=["--platform", "win64", "--dry"], chromedriver=False, wrkdir=tmp_path)
     assert "Found downloadable chromedriver" in res.stdout
     assert "/win64/" in res.stdout
     assert res.returncode == 0
 
 
-def test_cli_version(tmp_path):  # -v version
+def test_version_from_command_line_key(tmp_path):
     res, bindir, homedir = run_upgrade(args=["--chrome", NEW_VERSION], chrome=False, chromedriver=False, wrkdir=tmp_path)
     assert "Found downloadable chromedriver" in res.stdout
     assert "Command line" in res.stdout
 
 
-def test_version_without_flag(tmp_path):  # bare version
+def test_version_without_flag(tmp_path):
     res, bindir, homedir = run_upgrade(args=[NEW_VERSION], chrome=False, chromedriver=False, wrkdir=tmp_path)
     assert "Found downloadable chromedriver" in res.stdout
     assert "Command line" in res.stdout
