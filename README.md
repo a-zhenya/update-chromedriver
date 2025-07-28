@@ -1,3 +1,5 @@
+[![Script Tests](https://github.com/a-zhenya/update-chromedriver/actions/workflows/tests.yaml/badge.svg)](https://github.com/a-zhenya/update-chromedriver/actions/workflows/tests.yaml)
+
 # upgrade-chromedriver
 
 Bash script to download and update webdriver for Google Chrome.
