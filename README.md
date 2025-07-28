@@ -33,6 +33,11 @@ chmod +x $HOME/.local/bin/upgrade-chromedriver
 rm -v update-chromedriver.zip
 ```
 
+# Upgrading
+```
+upgrade-chromedriver --self-update
+```
+
 # Technical Details
 API endpoint in use:<br>
 https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json
