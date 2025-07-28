@@ -77,10 +77,10 @@ while [ $# -gt 0 ]; do
             DRY=1
             ;;
         --self-update)
-            ZIP_FILE=$(mktemp /tmp/update-chromedriver-XXXXXX.zip)
+            ZIP_FILE="$(mktemp /tmp/update-chromedriver-XXXXXX.zip)"
             curl -L -o "$ZIP_FILE" \
                 "$(curl -s https://api.github.com/repos/a-zhenya/update-chromedriver/releases/latest | jq -r .zipball_url)"
-            unzip -j -f -o -d $(dirname "$0") "$ZIP_FILE" "*/upgrade-chromedriver"
+            unzip -j -f -o -d "$(dirname "$0")" "$ZIP_FILE" "*/upgrade-chromedriver"
             chmod +x "$0"
             rm -v "$ZIP_FILE"
             echo "Self-update complete"
@@ -107,15 +107,15 @@ done
 
 # Determine Chrome version
 if [ "$USE_APT" = 1 ]; then
-    CHROME_VERSION=$(apt-get --just-print upgrade | grep "Conf google-chrome-stable" || [ $? -eq 1 ])
+    CHROME_VERSION="$(apt-get --just-print upgrade | grep "Conf google-chrome-stable" || [ $? -eq 1 ])"
     if [ -z "$CHROME_VERSION" ]; then
         echo "No upgradable google-chrome-stable"
         exit 0
     fi
-    CHROME_VERSION=$(echo $CHROME_VERSION | grep -Eo '[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+')
+    CHROME_VERSION="$(echo $CHROME_VERSION | grep -Eo '[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+')"
     version_source="APT cache"
 elif [ -z "$CHROME_VERSION" ]; then
-    CHROME_VERSION=$(google-chrome --version | cut -d ' ' -f 3)
+    CHROME_VERSION="$(google-chrome --version | cut -d ' ' -f 3)"
     if [ -z "$CHROME_VERSION" ]; then
         echo "Google Chrome is not installed or not found in PATH"
         exit 1
@@ -129,7 +129,7 @@ echo "Chrome version = $CHROME_VERSION ($version_source)"
 
 # Check existing chromedriver
 if [ "$FORCE" != 1 ] && command -v chromedriver >/dev/null 2>&1; then
-    INSTALLED_VERSION=$(chromedriver --version | cut -d ' ' -f 2)
+    INSTALLED_VERSION="$(chromedriver --version | cut -d ' ' -f 2)"
     if [ "$CHROME_VERSION" = "$INSTALLED_VERSION" ]; then
         echo "Chromedriver $INSTALLED_VERSION already installed"
         exit 0
@@ -155,9 +155,9 @@ fi
 
 # Get download URL
 API="https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json"
-URL=$(curl -s "$API" |
+URL="$(curl -s "$API" |
     jq -r --arg PLATFORM "$PLATFORM" --arg VERSION "$CHROME_VERSION" \
-        '.versions[] | select(.version==$VERSION).downloads.chromedriver[] | select(.platform==$PLATFORM).url')
+        '.versions[] | select(.version==$VERSION).downloads.chromedriver[] | select(.platform==$PLATFORM).url')"
 
 if [ -z "$URL" ]; then
     echo "Could not find downloadable chromedriver $CHROME_VERSION"
@@ -195,7 +195,7 @@ fi
 # Install driver
 if [ -z "$TARGET_DIR" ]; then
     if command -v chromedriver >/dev/null 2>&1; then
-        TARGET_DIR=$(dirname "$(command -v chromedriver)")
+        TARGET_DIR="$(dirname "$(command -v chromedriver)")"
     else
         if [ -d "$DEFAULT_TARGET_DIR" ]; then
             TARGET_DIR="$DEFAULT_TARGET_DIR"

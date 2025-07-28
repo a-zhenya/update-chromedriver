@@ -49,7 +49,7 @@ while [ $# -gt 0 ]; do
 done
 echo http://example.com/downloads/$VERSION/$PLATFORM/chromedriver.zip
 """
-        (self.path / "jq").write_text(script if success else "")
+        (self.path / "jq").write_text(script if success else "#!/bin/bash\nexit 0\n")
         (self.path / "jq").chmod(0o755)
 
     def install_unzip(self, success: bool):
