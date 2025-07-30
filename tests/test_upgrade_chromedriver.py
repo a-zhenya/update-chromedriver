@@ -78,7 +78,7 @@ cat "$ZIP" > "$DIR/chromedriver"
         (self.path / "unzip").chmod(0o755)
 
     def mock_apt(self, version):
-        out = f'echo "Conf google-chrome-stable: {version}"' if version else ""
+        out = f'echo "Conf google-chrome-stable {version}"' if version else ""
         (self.path / "apt-get").write_text(f"#!/bin/bash\n{out}\n")
         (self.path / "apt-get").chmod(0o755)
 

@@ -77,12 +77,10 @@ while [ $# -gt 0 ]; do
             DRY=1
             ;;
         --self-update)
-            ZIP_FILE="$(mktemp /tmp/update-chromedriver-XXXXXX.zip)"
-            curl -L -o "$ZIP_FILE" \
-                "$(curl -s https://api.github.com/repos/a-zhenya/update-chromedriver/releases/latest | jq -r .zipball_url)"
-            unzip -j -f -o -d "$(dirname "$0")" "$ZIP_FILE" "*/upgrade-chromedriver"
+            curl -Ls \
+                "$(curl -s https://api.github.com/repos/a-zhenya/update-chromedriver/releases/latest | jq -r .tarball_url)" \
+                | tar xvz --wildcards --overwrite --transform="s|.*|$(dirname "$0")/$(basename "$0")|" "*/upgrade-chromedriver"
             chmod +x "$0"
-            rm -v "$ZIP_FILE"
             echo "Self-update complete"
             exit 0
             ;;
