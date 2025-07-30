@@ -172,7 +172,7 @@ if [ "$DRY" = 1 ]; then
 fi
 
 # Download driver
-ZIP_PATH="${DOWNLOAD_DIR}/chromedriver-${PLATFORM}-${CHROME_VERSION}.zip"
+ZIP_PATH="$(mktemp -p "$DOWNLOAD_DIR" chromedriver-${PLATFORM}-${CHROME_VERSION}-XXXXXX.zip)"
 echo "Downloading chromedriver to $ZIP_PATH..."
 set +e
 curl -sL -o "$ZIP_PATH" "$URL"

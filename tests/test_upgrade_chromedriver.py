@@ -103,7 +103,7 @@ def run_upgrade(
     args = ["bash", "upgrade-chromedriver"] + (args or [])
     bindir = Path(wrkdir) / "bin"
     bindir.mkdir(exist_ok=True)
-    for tool in ["bash", "cat", "grep", "chmod", "cut", "touch", "rm", "ls", "dirname"]:
+    for tool in ["bash", "cat", "grep", "chmod", "cut", "touch", "rm", "ls", "dirname", "mktemp"]:
         os.symlink(f"/bin/{tool}", bindir / tool)
 
     mock = MockApps(bindir)
@@ -164,7 +164,7 @@ def test_dry_run(tmp_path):
 
 
 def test_force_install(tmp_path):  # force reinstall
-    res, bindir, homedir = run_upgrade(args=["--force"], wrkdir=tmp_path)
+    res, bindir, homedir = run_upgrade(args=["--force"], chrome=OLD_VERSION, chromedriver=OLD_VERSION, wrkdir=tmp_path)
     assert "example.com" in (bindir / "chromedriver").read_text()  # Ensure downloading happened
     assert res.returncode == 0
 
@@ -178,7 +178,7 @@ def test_download_dir_change(tmp_path):
         wrkdir=tmp_path,
         unzip_success=False,
     )
-    assert len(list(dl_dir.iterdir())) == 1
+    assert sum(1 for _ in dl_dir.iterdir()) == 1
     assert res.returncode == 1
 
 
@@ -258,7 +258,8 @@ def test_download_only(tmp_path):
     )
     assert res.returncode == 0
     assert not (tgt_dir / "chromedriver").exists()
-    assert (dl_dir / f"chromedriver-linux64-{NEW_VERSION}.zip").exists()
+    assert sum(1 for _ in dl_dir.iterdir()) == 1
+    assert next(iter(dl_dir.iterdir())).name.startswith(f"chromedriver-linux64-{NEW_VERSION}")
 
 
 def test_help_flag(tmp_path):
