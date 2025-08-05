@@ -30,6 +30,8 @@ Options:
   --platform PLATFORM       Specify platform (default = linux64, the key implies --download-only)
                             Variants: linux64, mac-arm64, mac-x64, win32, win64
   -f, --force               Always download
+  --bash-completion         Output bash completion script. This call to enable:
+                            eval "\$($(basename "$0") --bash-completion)"
   --version                 Print version and exit
   --self-update             Update this script to the latest release
   -h, --help                Show this help
@@ -82,6 +84,40 @@ while [ $# -gt 0 ]; do
                 | tar xvz --wildcards --overwrite --strip-components=1 --directory="$(dirname "$0")" "*/upgrade-chromedriver"
             chmod +x "$0"
             echo "Self-update complete"
+            exit 0
+            ;;
+        --bash-completion)
+            cat <<'EOF'
+_upgrade_chromedriver() {
+    local cur prev opts
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    opts="--dry --download-only --leave-zip-on-failure --chrome --platform --apt --version --self-update --help -t --target-dir -d --download-dir --force --bash-completion"
+
+    case "$prev" in
+        --platform)
+            COMPREPLY=( $(compgen -W "linux64 mac-arm64 mac-x64 win32 win64" -- "$cur") )
+            return 0
+            ;;
+        --chrome)
+            COMPREPLY=()
+            return 0
+            ;;
+        -t|--target-dir|-d|--download-dir)
+            compopt -o nospace 2>/dev/null
+            COMPREPLY=( $(compgen -d -- "$cur" | sed 's#$#/#') )
+            return 0
+            ;;
+    esac
+    if [[ "$cur" == -* ]]; then
+        COMPREPLY=( $(compgen -W "${opts}" -- "$cur") )
+        return 0
+    fi
+}
+
+complete -F _upgrade_chromedriver upgrade-chromedriver
+EOF
             exit 0
             ;;
         --version)
