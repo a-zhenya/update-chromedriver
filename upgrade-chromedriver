@@ -79,7 +79,7 @@ while [ $# -gt 0 ]; do
         --self-update)
             curl -Ls \
                 "$(curl -s https://api.github.com/repos/a-zhenya/update-chromedriver/releases/latest | jq -r .tarball_url)" \
-                | tar xvz --wildcards --overwrite --transform="s|.*|$(dirname "$0")/$(basename "$0")|" "*/upgrade-chromedriver"
+                | tar xvz --wildcards --overwrite --strip-components=1 --directory="$(dirname "$0")" "*/upgrade-chromedriver"
             chmod +x "$0"
             echo "Self-update complete"
             exit 0
