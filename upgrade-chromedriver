@@ -210,12 +210,8 @@ fi
 # Download driver
 ZIP_PATH="$(mktemp -p "$DOWNLOAD_DIR" chromedriver-${PLATFORM}-${CHROME_VERSION}-XXXXXX.zip)"
 echo "Downloading chromedriver to $ZIP_PATH..."
-set +e
-curl -sL -o "$ZIP_PATH" "$URL"
-curl_status=$?
-set -e
 
-if [ $curl_status -ne 0 ] || [ ! -f "$ZIP_PATH" ]; then
+if ! curl -sL -o "$ZIP_PATH" "$URL" || [ ! -s "$ZIP_PATH" ]; then
     echo "Failed to download chromedriver"
     exit 1
 fi
