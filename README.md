@@ -28,11 +28,10 @@ Additional keys:
 
 # Installation
 ```
-curl -L -o update-chromedriver.zip \
-    "$(curl -s https://api.github.com/repos/a-zhenya/update-chromedriver/releases/latest | jq -r .zipball_url)"
-unzip -j -d $HOME/.local/bin/ update-chromedriver.zip "*/upgrade-chromedriver"
+curl -L -s \
+    "$(curl -s https://api.github.com/repos/a-zhenya/update-chromedriver/releases/latest | jq -r .tarball_url)" \
+    | tar xvz --wildcards --strip-components 1 -C $HOME/.local/bin/ "*/upgrade-chromedriver"
 chmod +x $HOME/.local/bin/upgrade-chromedriver
-rm -v update-chromedriver.zip
 ```
 
 # Upgrading
