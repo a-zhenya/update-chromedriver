@@ -1,0 +1,36 @@
+name: Check Version on New Tag
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get new tag
+        run: echo "NEW_TAG=${GITHUB_REF##*/v}" >> $GITHUB_ENV
+
+      - name: Show version from run-app
+        id: version
+        run: |
+          VERSION_OUTPUT=$(bash upgrade-chromedriver --version)
+          if [ "$(echo $VERSION_OUTPUT | cut -d" " -f1-2)" != "upgrade-chromedriver version" ]; then
+            echo "❌ Invalid version output: $VERSION_OUTPUT"
+            echo "Expected format: upgrade-chromedriver version X.Y.Z"
+            exit 1
+          fi
+          echo "VERSION_REPORTED=$(echo $VERSION_OUTPUT | cut -d" " -f3)" >> $GITHUB_ENV
+
+      - name: Compare tag with version output
+        run: |
+          if [ "$VERSION_REPORTED" != "$NEW_TAG" ]; then
+            echo "❌ Version mismatch: tag is $NEW_TAG, but app reported: $VERSION_OUTPUT"
+            exit 1
+          else
+            echo "✅ Version matches tag: $VERSION_OUTPUT"
+          fi
