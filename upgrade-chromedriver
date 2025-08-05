@@ -33,7 +33,7 @@ Options:
   --bash-completion         Output the bash completion script. To enable, run:
                             eval "\$($(basename "$0") --bash-completion)"
   --version                 Print the script version and exit
-  --self-update             Update this script to the latest release
+  --self-update [RELEASE]   Update this script to the latest or specific release
   -h, --help                Show this help message
 EOF
     exit 1
@@ -79,8 +79,12 @@ while [ $# -gt 0 ]; do
             DRY=1
             ;;
         --self-update)
+            shift
+            RELEASE="${1:-}"
+            QUERY_SUFFIX="${RELEASE:+tags/$RELEASE}"
+            QUERY_SUFFIX="${QUERY_SUFFIX:-latest}"
             curl -Ls \
-                "$(curl -s https://api.github.com/repos/a-zhenya/update-chromedriver/releases/latest | jq -r .tarball_url)" \
+                "$(curl -s https://api.github.com/repos/a-zhenya/update-chromedriver/releases/$QUERY_SUFFIX | jq -r .tarball_url)" \
                 | tar xvz --wildcards --overwrite --strip-components=1 --directory="$(dirname "$0")" "*/upgrade-chromedriver"
             chmod +x "$0"
             echo "Self-update complete"
