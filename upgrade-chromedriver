@@ -2,7 +2,7 @@
 
 set -ue
 
-VERSION="1.4"
+VERSION="1.4.1"
 DOWNLOAD_DIR="/tmp"
 DEFAULT_TARGET_DIR="$HOME/.local/bin"
 DRY=0
@@ -26,7 +26,7 @@ Options:
   -d, --download-dir DIR    Directory where the archivee will be downloaded
   --chrome VERSION          Use this Chrome version (implies --dry). Can be specified without --chrome
                             If not specified, the version from the installed Chrome will be used
-  --apt                     Use the version from apt (implies --dry)
+  -a, --apt                 Use the version from apt (implies --dry)
   --platform PLATFORM       Specify the platform (default: linux64, implies --download-only)
                             Available values: linux64, mac-arm64, mac-x64, win32, win64
   -f, --force               Always download
@@ -74,7 +74,7 @@ while [ $# -gt 0 ]; do
             DOWNLOAD_ONLY=1
             FORCE=1
             ;;
-        --apt)
+        -a|--apt)
             USE_APT=1
             DRY=1
             ;;
@@ -97,7 +97,7 @@ _upgrade_chromedriver() {
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-    opts="--dry --download-only --leave-zip-on-failure --chrome --platform --apt --version --self-update --help -t --target-dir -d --download-dir --force --bash-completion"
+    opts="--dry --download-only --leave-zip-on-failure --chrome --platform --apt --version --self-update --help --target-dir --download-dir --force --bash-completion"
 
     case "$prev" in
         --platform)
