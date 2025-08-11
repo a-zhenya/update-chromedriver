@@ -85,12 +85,12 @@ while [ $# -gt 0 ]; do
             QUERY_SUFFIX="${RELEASE:+tags/$RELEASE}"
             QUERY_SUFFIX="${QUERY_SUFFIX:-latest}"
             RELEASE_INFO="$(curl -s https://api.github.com/repos/a-zhenya/update-chromedriver/releases/$QUERY_SUFFIX)" 
-            if [ -z "$RELEASE_INFO" -o "$(echo $RELEASE_INFO | jq .status)" != null ]; then
+            if [ -z "$RELEASE_INFO" -o "$(printf '%s' "$RELEASE_INFO" | jq .status)" != null ]; then
                 echo "Failed to fetch release information: $QUERY_SUFFIX"
                 exit 1
             fi
-            echo $RELEASE_INFO | jq -r '.tag_name + " " + .name + "\n" + .html_url + "\n" + .body'
-            curl -Ls "$(echo "$RELEASE_INFO" | jq -r .tarball_url)" \
+            printf '%s' "$RELEASE_INFO" | jq -r '.tag_name + " " + .name + "\n" + .html_url + "\n" + .body'
+            curl -Ls "$(printf '%s' "$RELEASE_INFO" | jq -r .tarball_url)" \
                 | tar xvz --wildcards --overwrite --strip-components=1 --directory="$(dirname "$0")" "*/upgrade-chromedriver"
             chmod +x "$0"
             echo "Self-update complete"
