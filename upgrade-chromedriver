@@ -2,7 +2,7 @@
 
 set -ue
 
-VERSION="1.4.2"
+VERSION="1.4.3"
 DOWNLOAD_DIR="/tmp"
 DEFAULT_TARGET_DIR="$HOME/.local/bin"
 DRY=0
@@ -29,7 +29,7 @@ Options:
                             If not specified, the version from the installed Chrome will be used
   -a, --apt                 Use the version from apt (implies --dry)
   --platform PLATFORM       Specify the platform (default: $PLATFORM, implies --download-only)
-                            Available values: ${PLATFORMS// /, }
+                            Available values: $PLATFORMS
   -f, --force               Always download
   --bash-completion         Output the bash completion script. To enable, run:
                             eval "\$($(basename "$0") --bash-completion)"
