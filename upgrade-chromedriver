@@ -136,6 +136,10 @@ EOF
         -h|--help)
             usage
             ;;
+        -*)
+            echo "Unknown option: $1"
+            usage
+            ;;
         *)
             if [ "$UNGUARDED_VERSION" = 1 ]; then
                usage
