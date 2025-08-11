@@ -2,7 +2,7 @@
 
 set -ue
 
-VERSION="1.4"
+VERSION="1.4.1"
 DOWNLOAD_DIR="/tmp"
 DEFAULT_TARGET_DIR="$HOME/.local/bin"
 DRY=0
@@ -12,6 +12,7 @@ CHROME_VERSION=""
 USE_APT=0
 LEAVE_ZIP_ON_FAILURE=0
 PLATFORM=linux64
+PLATFORMS="linux64 mac-arm64 mac-x64 win32 win64"
 FORCE=0
 
 usage() {
@@ -26,9 +27,9 @@ Options:
   -d, --download-dir DIR    Directory where the archivee will be downloaded
   --chrome VERSION          Use this Chrome version (implies --dry). Can be specified without --chrome
                             If not specified, the version from the installed Chrome will be used
-  --apt                     Use the version from apt (implies --dry)
-  --platform PLATFORM       Specify the platform (default: linux64, implies --download-only)
-                            Available values: linux64, mac-arm64, mac-x64, win32, win64
+  -a, --apt                 Use the version from apt (implies --dry)
+  --platform PLATFORM       Specify the platform (default: $PLATFORM, implies --download-only)
+                            Available values: ${PLATFORMS// /, }
   -f, --force               Always download
   --bash-completion         Output the bash completion script. To enable, run:
                             eval "\$($(basename "$0") --bash-completion)"
@@ -74,7 +75,7 @@ while [ $# -gt 0 ]; do
             DOWNLOAD_ONLY=1
             FORCE=1
             ;;
-        --apt)
+        -a|--apt)
             USE_APT=1
             DRY=1
             ;;
@@ -83,25 +84,30 @@ while [ $# -gt 0 ]; do
             RELEASE="${1:-}"
             QUERY_SUFFIX="${RELEASE:+tags/$RELEASE}"
             QUERY_SUFFIX="${QUERY_SUFFIX:-latest}"
-            curl -Ls \
-                "$(curl -s https://api.github.com/repos/a-zhenya/update-chromedriver/releases/$QUERY_SUFFIX | jq -r .tarball_url)" \
+            RELEASE_INFO="$(curl -s https://api.github.com/repos/a-zhenya/update-chromedriver/releases/$QUERY_SUFFIX)" 
+            if [ -z "$RELEASE_INFO" -o "$(echo $RELEASE_INFO | jq .status)" != null ]; then
+                echo "Failed to fetch release information: $QUERY_SUFFIX"
+                exit 1
+            fi
+            echo $RELEASE_INFO | jq -r '.tag_name + " " + .name + "\n" + .html_url + "\n" + .body'
+            curl -Ls "$(echo "$RELEASE_INFO" | jq -r .tarball_url)" \
                 | tar xvz --wildcards --overwrite --strip-components=1 --directory="$(dirname "$0")" "*/upgrade-chromedriver"
             chmod +x "$0"
             echo "Self-update complete"
             exit 0
             ;;
         --bash-completion)
-            cat <<'EOF'
+            cat <<EOF
 _upgrade_chromedriver() {
     local cur prev opts
     COMPREPLY=()
-    cur="${COMP_WORDS[COMP_CWORD]}"
-    prev="${COMP_WORDS[COMP_CWORD-1]}"
-    opts="--dry --download-only --leave-zip-on-failure --chrome --platform --apt --version --self-update --help -t --target-dir -d --download-dir --force --bash-completion"
+    cur="\${COMP_WORDS[COMP_CWORD]}"
+    prev="\${COMP_WORDS[COMP_CWORD-1]}"
+    opts="--dry --download-only --leave-zip-on-failure --chrome --platform --apt --version --self-update --help --target-dir --download-dir --force --bash-completion"
 
-    case "$prev" in
+    case "\$prev" in
         --platform)
-            COMPREPLY=( $(compgen -W "linux64 mac-arm64 mac-x64 win32 win64" -- "$cur") )
+            COMPREPLY=( \$(compgen -W "$PLATFORMS" -- "\$cur") )
             return 0
             ;;
         --chrome)
@@ -110,12 +116,12 @@ _upgrade_chromedriver() {
             ;;
         -t|--target-dir|-d|--download-dir)
             compopt -o nospace 2>/dev/null
-            COMPREPLY=( $(compgen -d -- "$cur" | sed 's#$#/#') )
+            COMPREPLY=( \$(compgen -d -- "\$cur" | sed 's#\$#/#') )
             return 0
             ;;
     esac
-    if [[ "$cur" == -* ]]; then
-        COMPREPLY=( $(compgen -W "${opts}" -- "$cur") )
+    if [[ "\$cur" == -* ]]; then
+        COMPREPLY=( \$(compgen -W "\${opts}" -- "\$cur") )
         return 0
     fi
 }
@@ -129,6 +135,10 @@ EOF
             exit 0
             ;;
         -h|--help)
+            usage
+            ;;
+        -*)
+            echo "Unknown option: $1"
             usage
             ;;
         *)

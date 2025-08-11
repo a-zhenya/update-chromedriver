@@ -18,7 +18,7 @@ class MockApps:
         (self.path / "chromedriver").write_text(f"#!/bin/bash\necho ChromeDriver {version} '(hash)'\n")
         (self.path / "chromedriver").chmod(0o755)
 
-    def install_curl(self, success: bool):
+    def install_curl(self, create_file: bool, success_code: bool):
         script = """#!/bin/bash
 while [ $# -gt 0 ]; do
     if [ "$1" = "-o" ]; then shift; FILE="$1"; fi
@@ -29,7 +29,9 @@ if [ -n "$FILE" ]; then
     echo $URL > "$FILE"
 fi
 """
-        (self.path / "curl").write_text(script if success else "#!/bin/bash\nexit 1\n")
+        (self.path / "curl").write_text(
+            (script if create_file else "#!/bin/bash\nexit 0\n") if success_code else "#!/bin/bash\nexit 1\n"
+        )
         (self.path / "curl").chmod(0o755)
 
     def install_jq(self, success: bool):
@@ -82,8 +84,8 @@ cat "$ZIP" > "$DIR/chromedriver"
         (self.path / "apt-get").write_text(f"#!/bin/bash\n{out}\n")
         (self.path / "apt-get").chmod(0o755)
 
-    def install_tools(self, curl_success=True, jq_success=True, unzip_success=True):
-        self.install_curl(curl_success)
+    def install_tools(self, curl_download=True, curl_success=True, jq_success=True, unzip_success=True):
+        self.install_curl(curl_download, curl_success)
         self.install_jq(jq_success)
         self.install_unzip(unzip_success)
 
@@ -95,12 +97,16 @@ def run_upgrade(
     chromedriver=OLD_VERSION,
     tools=True,
     update_found=True,
+    curl_download=True,
     curl_success=True,
     apt_version=NEW_VERSION,
     unzip_success=True,
     wrkdir=".",
 ):
-    args = ["bash", "upgrade-chromedriver"] + (args or [])
+    save_cwd = Path.cwd()
+    (Path(wrkdir) / "cwd").mkdir(parents=True, exist_ok=True)
+    os.chdir(Path(wrkdir) / "cwd")
+    args = ["bash", save_cwd / "upgrade-chromedriver"] + (args or [])
     bindir = Path(wrkdir) / "bin"
     bindir.mkdir(exist_ok=True)
     for tool in ["bash", "cat", "grep", "chmod", "cut", "touch", "rm", "ls", "dirname", "mktemp"]:
@@ -112,7 +118,9 @@ def run_upgrade(
     if chromedriver:
         mock.install_chromedriver(chromedriver)
     if tools:
-        mock.install_tools(curl_success=curl_success, jq_success=update_found, unzip_success=unzip_success)
+        mock.install_tools(
+            curl_download=curl_download, curl_success=curl_success, jq_success=update_found, unzip_success=unzip_success
+        )
     mock.mock_apt(apt_version)
 
     homedir = Path(wrkdir) / "home"
@@ -120,7 +128,9 @@ def run_upgrade(
     if not env:
         env = {}
     env.update({"HOME": str(homedir), "PATH": str(bindir)})
-    return sp.run(args, text=True, stdin=sp.DEVNULL, stdout=sp.PIPE, stderr=sp.PIPE, env=env), bindir, homedir
+    res = sp.run(args, text=True, stdin=sp.DEVNULL, stdout=sp.PIPE, stderr=sp.PIPE, env=env), bindir, homedir
+    os.chdir(save_cwd)
+    return res
 
 
 # === POSITIVE PATHS ===
@@ -190,7 +200,9 @@ def test_platform_specified(tmp_path):
 
 
 def test_version_from_command_line_key(tmp_path):
-    res, bindir, homedir = run_upgrade(args=["--chrome", NEW_VERSION], chrome=False, chromedriver=False, wrkdir=tmp_path)
+    res, bindir, homedir = run_upgrade(
+        args=["--chrome", NEW_VERSION], chrome=False, chromedriver=False, wrkdir=tmp_path
+    )
     assert "Found downloadable chromedriver" in res.stdout
     assert "Command line" in res.stdout
 
@@ -216,8 +228,14 @@ def test_missing_tools(tmp_path):  # no curl/jq/unzip
     assert "Required tool" in res.stdout
 
 
-def test_download_fail(tmp_path):
+def test_curl_fail(tmp_path):
     res, bindir, homedir = run_upgrade(curl_success=False, chromedriver=False, wrkdir=tmp_path)
+    assert res.returncode != 0
+    assert "Failed to download" in res.stdout
+
+
+def test_download_fail(tmp_path):
+    res, bindir, homedir = run_upgrade(curl_download=False, chromedriver=False, wrkdir=tmp_path)
     assert res.returncode != 0
     assert "Failed to download" in res.stdout
 
