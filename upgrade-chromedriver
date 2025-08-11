@@ -2,7 +2,7 @@
 
 set -ue
 
-VERSION="1.4.1"
+VERSION="1.4.2"
 DOWNLOAD_DIR="/tmp"
 DEFAULT_TARGET_DIR="$HOME/.local/bin"
 DRY=0
