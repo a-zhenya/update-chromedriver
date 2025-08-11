@@ -103,7 +103,10 @@ def run_upgrade(
     unzip_success=True,
     wrkdir=".",
 ):
-    args = ["bash", "upgrade-chromedriver"] + (args or [])
+    save_cwd = Path.cwd()
+    (Path(wrkdir) / "cwd").mkdir(parents=True, exist_ok=True)
+    os.chdir(Path(wrkdir) / "cwd")
+    args = ["bash", save_cwd / "upgrade-chromedriver"] + (args or [])
     bindir = Path(wrkdir) / "bin"
     bindir.mkdir(exist_ok=True)
     for tool in ["bash", "cat", "grep", "chmod", "cut", "touch", "rm", "ls", "dirname", "mktemp"]:
@@ -125,7 +128,9 @@ def run_upgrade(
     if not env:
         env = {}
     env.update({"HOME": str(homedir), "PATH": str(bindir)})
-    return sp.run(args, text=True, stdin=sp.DEVNULL, stdout=sp.PIPE, stderr=sp.PIPE, env=env), bindir, homedir
+    res = sp.run(args, text=True, stdin=sp.DEVNULL, stdout=sp.PIPE, stderr=sp.PIPE, env=env), bindir, homedir
+    os.chdir(save_cwd)
+    return res
 
 
 # === POSITIVE PATHS ===
