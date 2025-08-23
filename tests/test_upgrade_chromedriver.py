@@ -1,6 +1,7 @@
 import subprocess as sp
 from pathlib import Path
 import os
+import pytest
 
 OLD_VERSION = "1.1.1.1"
 NEW_VERSION = "2.2.2.2"
@@ -157,10 +158,19 @@ def test_driver_already_up_to_date(tmp_path):
     assert res.returncode == 0
 
 
-def test_target_dir_change(tmp_path):
+@pytest.mark.parametrize(
+    "chromedriver_version",
+    [
+        pytest.param(OLD_VERSION, id="Old driver is present"),
+        pytest.param(None, id="No driver is present"),
+    ],
+)
+def test_target_dir_change(tmp_path, chromedriver_version):
     tgt_dir = tmp_path / "target"
     tgt_dir.mkdir()
-    res, bindir, homedir = run_upgrade(args=["--target-dir", str(tgt_dir)], chromedriver=False, wrkdir=tmp_path)
+    res, bindir, homedir = run_upgrade(
+        args=["--target-dir", str(tgt_dir)], chromedriver=chromedriver_version, wrkdir=tmp_path
+    )
     assert (tgt_dir / "chromedriver").exists()
     assert os.access(tgt_dir / "chromedriver", os.X_OK)
     assert res.returncode == 0
@@ -199,24 +209,40 @@ def test_platform_specified(tmp_path):
     assert res.returncode == 0
 
 
-def test_version_from_command_line_key(tmp_path):
+@pytest.mark.parametrize(
+    ["args", "source"],
+    [
+        pytest.param(["--chrome", NEW_VERSION], "Command line", id="Commmand line with --chrome"),
+        pytest.param([NEW_VERSION], "Command line", id="As positional argument"),
+        pytest.param(["--apt"], "APT cache", id="Version from APT cache"),
+    ],
+)
+def test_version_from_various_sources(tmp_path, args, source):
+    res, bindir, homedir = run_upgrade(args=args, chrome=False, chromedriver=False, wrkdir=tmp_path)
+    assert "Found downloadable chromedriver" in res.stdout
+    assert source in res.stdout
+
+
+def test_download_only(tmp_path):
+    tgt_dir = tmp_path / "target"
+    tgt_dir.mkdir()
+    dl_dir = tmp_path / "downloads"
+    dl_dir.mkdir()
     res, bindir, homedir = run_upgrade(
-        args=["--chrome", NEW_VERSION], chrome=False, chromedriver=False, wrkdir=tmp_path
+        args=["--download-only", "--target-dir", str(tgt_dir), "--download-dir", str(dl_dir)],
+        chromedriver=False,
+        wrkdir=tmp_path,
     )
-    assert "Found downloadable chromedriver" in res.stdout
-    assert "Command line" in res.stdout
+    assert res.returncode == 0
+    assert not (tgt_dir / "chromedriver").exists()
+    assert sum(1 for _ in dl_dir.iterdir()) == 1
+    assert next(iter(dl_dir.iterdir())).name.startswith(f"chromedriver-linux64-{NEW_VERSION}")
 
 
-def test_version_without_flag(tmp_path):
-    res, bindir, homedir = run_upgrade(args=[NEW_VERSION], chrome=False, chromedriver=False, wrkdir=tmp_path)
-    assert "Found downloadable chromedriver" in res.stdout
-    assert "Command line" in res.stdout
-
-
-def test_version_from_apt(tmp_path):
-    res, bindir, homedir = run_upgrade(args=["--apt"], chrome=False, chromedriver=False, wrkdir=tmp_path)
-    assert "Found downloadable chromedriver" in res.stdout
-    assert "APT cache" in res.stdout
+def test_help_flag(tmp_path):
+    res, bindir, homedir = run_upgrade(args=["--help"], wrkdir=tmp_path)
+    assert "Usage:" in res.stdout
+    assert res.returncode == 1
 
 
 # === NEGATIVE PATHS ===
@@ -228,14 +254,17 @@ def test_missing_tools(tmp_path):  # no curl/jq/unzip
     assert "Required tool" in res.stdout
 
 
-def test_curl_fail(tmp_path):
-    res, bindir, homedir = run_upgrade(curl_success=False, chromedriver=False, wrkdir=tmp_path)
-    assert res.returncode != 0
-    assert "Failed to download" in res.stdout
-
-
-def test_download_fail(tmp_path):
-    res, bindir, homedir = run_upgrade(curl_download=False, chromedriver=False, wrkdir=tmp_path)
+@pytest.mark.parametrize(
+    ["curl_success", "curl_download"],
+    [
+        pytest.param(False, False, id="curl returns error"),
+        pytest.param(True, False, id="curl does not create a file"),
+    ],
+)
+def test_curl_fail(tmp_path, curl_success, curl_download):
+    res, bindir, homedir = run_upgrade(
+        curl_success=curl_success, curl_download=curl_download, chromedriver=False, wrkdir=tmp_path
+    )
     assert res.returncode != 0
     assert "Failed to download" in res.stdout
 
@@ -264,23 +293,10 @@ def test_apt_version_not_found(tmp_path):
     assert res.returncode == 0
 
 
-def test_download_only(tmp_path):
-    tgt_dir = tmp_path / "target"
-    tgt_dir.mkdir()
+def test_download_dir_not_writable(tmp_path):
     dl_dir = tmp_path / "downloads"
     dl_dir.mkdir()
-    res, bindir, homedir = run_upgrade(
-        args=["--download-only", "--target-dir", str(tgt_dir), "--download-dir", str(dl_dir)],
-        chromedriver=False,
-        wrkdir=tmp_path,
-    )
-    assert res.returncode == 0
-    assert not (tgt_dir / "chromedriver").exists()
-    assert sum(1 for _ in dl_dir.iterdir()) == 1
-    assert next(iter(dl_dir.iterdir())).name.startswith(f"chromedriver-linux64-{NEW_VERSION}")
-
-
-def test_help_flag(tmp_path):
-    res, bindir, homedir = run_upgrade(args=["--help"], wrkdir=tmp_path)
-    assert "Usage:" in res.stdout
-    assert res.returncode == 1
+    dl_dir.chmod(0o500)  # Read-only
+    res, bindir, homedir = run_upgrade(args=["--download-dir", str(dl_dir)], chromedriver=False, wrkdir=tmp_path)
+    assert res.returncode != 0
+    assert "Download directory is not writable" in res.stdout
