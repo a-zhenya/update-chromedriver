@@ -1,6 +1,7 @@
 import subprocess as sp
 from pathlib import Path
 import os
+import pytest
 
 OLD_VERSION = "1.1.1.1"
 NEW_VERSION = "2.2.2.2"
@@ -54,11 +55,16 @@ echo http://example.com/downloads/$VERSION/$PLATFORM/chromedriver.zip
         (self.path / "jq").write_text(script if success else "#!/bin/bash\nexit 0\n")
         (self.path / "jq").chmod(0o755)
 
-    def install_unzip(self, success: bool):
-        script = """#!/bin/bash
+    def install_unzip(self, verify: bool, success: bool):
+        verification_return = "0" if verify else "1"
+        unzip_return = "0" if success else "1"
+        script = f"""#!/bin/bash
 ZIP=""
 while [ $# -gt 0 ]; do
     case "$1" in
+        -t)
+            exit {verification_return}
+            ;;
         -d)
             shift
             DIR="$1"
@@ -74,9 +80,12 @@ while [ $# -gt 0 ]; do
     esac
     shift
 done
+if [ {unzip_return} -ne 0 ]; then
+    exit {unzip_return}
+fi
 cat "$ZIP" > "$DIR/chromedriver"
 """
-        (self.path / "unzip").write_text(script if success else "#!/bin/bash\nexit 1\n")
+        (self.path / "unzip").write_text(script)
         (self.path / "unzip").chmod(0o755)
 
     def mock_apt(self, version):
@@ -84,13 +93,16 @@ cat "$ZIP" > "$DIR/chromedriver"
         (self.path / "apt-get").write_text(f"#!/bin/bash\n{out}\n")
         (self.path / "apt-get").chmod(0o755)
 
-    def install_tools(self, curl_download=True, curl_success=True, jq_success=True, unzip_success=True):
+    def install_tools(
+        self, curl_download=True, curl_success=True, jq_success=True, unzip_verify=True, unzip_success=True
+    ):
         self.install_curl(curl_download, curl_success)
         self.install_jq(jq_success)
-        self.install_unzip(unzip_success)
+        self.install_unzip(unzip_verify, unzip_success)
 
 
 def run_upgrade(
+    *,
     args=None,
     env=None,
     chrome=NEW_VERSION,
@@ -101,6 +113,7 @@ def run_upgrade(
     curl_success=True,
     apt_version=NEW_VERSION,
     unzip_success=True,
+    unzip_verify=True,
     wrkdir=".",
 ):
     save_cwd = Path.cwd()
@@ -119,7 +132,11 @@ def run_upgrade(
         mock.install_chromedriver(chromedriver)
     if tools:
         mock.install_tools(
-            curl_download=curl_download, curl_success=curl_success, jq_success=update_found, unzip_success=unzip_success
+            curl_download=curl_download,
+            curl_success=curl_success,
+            jq_success=update_found,
+            unzip_verify=unzip_verify,
+            unzip_success=unzip_success,
         )
     mock.mock_apt(apt_version)
 
@@ -157,10 +174,19 @@ def test_driver_already_up_to_date(tmp_path):
     assert res.returncode == 0
 
 
-def test_target_dir_change(tmp_path):
+@pytest.mark.parametrize(
+    "chromedriver_version",
+    [
+        pytest.param(OLD_VERSION, id="Old driver is present"),
+        pytest.param(None, id="No driver is present"),
+    ],
+)
+def test_target_dir_change(tmp_path, chromedriver_version):
     tgt_dir = tmp_path / "target"
     tgt_dir.mkdir()
-    res, bindir, homedir = run_upgrade(args=["--target-dir", str(tgt_dir)], chromedriver=False, wrkdir=tmp_path)
+    res, bindir, homedir = run_upgrade(
+        args=["--target-dir", str(tgt_dir)], chromedriver=chromedriver_version, wrkdir=tmp_path
+    )
     assert (tgt_dir / "chromedriver").exists()
     assert os.access(tgt_dir / "chromedriver", os.X_OK)
     assert res.returncode == 0
@@ -199,69 +225,18 @@ def test_platform_specified(tmp_path):
     assert res.returncode == 0
 
 
-def test_version_from_command_line_key(tmp_path):
-    res, bindir, homedir = run_upgrade(
-        args=["--chrome", NEW_VERSION], chrome=False, chromedriver=False, wrkdir=tmp_path
-    )
+@pytest.mark.parametrize(
+    ["args", "source"],
+    [
+        pytest.param(["--chrome", NEW_VERSION], "Command line", id="Commmand line with --chrome"),
+        pytest.param([NEW_VERSION], "Command line", id="As positional argument"),
+        pytest.param(["--apt"], "APT cache", id="Version from APT cache"),
+    ],
+)
+def test_version_from_various_sources(tmp_path, args, source):
+    res, bindir, homedir = run_upgrade(args=args, chrome=False, chromedriver=False, wrkdir=tmp_path)
     assert "Found downloadable chromedriver" in res.stdout
-    assert "Command line" in res.stdout
-
-
-def test_version_without_flag(tmp_path):
-    res, bindir, homedir = run_upgrade(args=[NEW_VERSION], chrome=False, chromedriver=False, wrkdir=tmp_path)
-    assert "Found downloadable chromedriver" in res.stdout
-    assert "Command line" in res.stdout
-
-
-def test_version_from_apt(tmp_path):
-    res, bindir, homedir = run_upgrade(args=["--apt"], chrome=False, chromedriver=False, wrkdir=tmp_path)
-    assert "Found downloadable chromedriver" in res.stdout
-    assert "APT cache" in res.stdout
-
-
-# === NEGATIVE PATHS ===
-
-
-def test_missing_tools(tmp_path):  # no curl/jq/unzip
-    res, bindir, homedir = run_upgrade(tools=False, wrkdir=tmp_path)
-    assert res.returncode != 0
-    assert "Required tool" in res.stdout
-
-
-def test_curl_fail(tmp_path):
-    res, bindir, homedir = run_upgrade(curl_success=False, chromedriver=False, wrkdir=tmp_path)
-    assert res.returncode != 0
-    assert "Failed to download" in res.stdout
-
-
-def test_download_fail(tmp_path):
-    res, bindir, homedir = run_upgrade(curl_download=False, chromedriver=False, wrkdir=tmp_path)
-    assert res.returncode != 0
-    assert "Failed to download" in res.stdout
-
-
-def test_unzip_fail(tmp_path):
-    res, bindir, homedir = run_upgrade(unzip_success=False, chromedriver=False, wrkdir=tmp_path)
-    assert res.returncode != 0
-    assert "Failed to extract" in res.stdout
-
-
-def test_no_chrome(tmp_path):
-    res, bindir, homedir = run_upgrade(update_found=False, chrome=False, wrkdir=tmp_path)
-    assert res.returncode != 0
-    assert "Google Chrome is not installed" in res.stdout
-
-
-def test_no_driver_version_available(tmp_path):
-    res, bindir, homedir = run_upgrade(update_found=False, chromedriver=False, wrkdir=tmp_path)
-    assert res.returncode != 0
-    assert "Could not find downloadable chromedriver" in res.stdout
-
-
-def test_apt_version_not_found(tmp_path):
-    res, bindir, homedir = run_upgrade(args=["--apt"], apt_version=None, chromedriver=False, wrkdir=tmp_path)
-    assert "No upgradable google-chrome-stable" in res.stdout
-    assert res.returncode == 0
+    assert source in res.stdout
 
 
 def test_download_only(tmp_path):
@@ -284,3 +259,67 @@ def test_help_flag(tmp_path):
     res, bindir, homedir = run_upgrade(args=["--help"], wrkdir=tmp_path)
     assert "Usage:" in res.stdout
     assert res.returncode == 1
+
+
+# === NEGATIVE PATHS ===
+
+
+def test_missing_tools(tmp_path):  # no curl/jq/unzip
+    res, bindir, homedir = run_upgrade(tools=False, wrkdir=tmp_path)
+    assert res.returncode != 0
+    assert "Required tool" in res.stdout
+
+
+@pytest.mark.parametrize(
+    ["curl_success", "curl_download"],
+    [
+        pytest.param(False, False, id="curl returns error"),
+        pytest.param(True, False, id="curl does not create a file"),
+    ],
+)
+def test_curl_fail(tmp_path, curl_success, curl_download):
+    res, bindir, homedir = run_upgrade(
+        curl_success=curl_success, curl_download=curl_download, chromedriver=False, wrkdir=tmp_path
+    )
+    assert res.returncode != 0
+    assert "Failed to download" in res.stdout
+
+
+@pytest.mark.parametrize(
+    ["verify", "unzip", "message"],
+    [
+        pytest.param(False, True, "Failed to download", id="Fail on verification"),
+        pytest.param(True, False, "Failed to extract", id="Fail on extraction"),
+    ],
+)
+def test_unzip_fail(tmp_path, verify, unzip, message):
+    res, bindir, homedir = run_upgrade(unzip_verify=verify, unzip_success=unzip, chromedriver=False, wrkdir=tmp_path)
+    assert res.returncode != 0
+    assert message in res.stdout
+
+
+def test_no_chrome(tmp_path):
+    res, bindir, homedir = run_upgrade(update_found=False, chrome=False, wrkdir=tmp_path)
+    assert res.returncode != 0
+    assert "Google Chrome is not installed" in res.stdout
+
+
+def test_no_driver_version_available(tmp_path):
+    res, bindir, homedir = run_upgrade(update_found=False, chromedriver=False, wrkdir=tmp_path)
+    assert res.returncode != 0
+    assert "Could not find downloadable chromedriver" in res.stdout
+
+
+def test_apt_version_not_found(tmp_path):
+    res, bindir, homedir = run_upgrade(args=["--apt"], apt_version=None, chromedriver=False, wrkdir=tmp_path)
+    assert "No upgradable google-chrome-stable" in res.stdout
+    assert res.returncode == 0
+
+
+def test_download_dir_not_writable(tmp_path):
+    dl_dir = tmp_path / "downloads"
+    dl_dir.mkdir()
+    dl_dir.chmod(0o500)  # Read-only
+    res, bindir, homedir = run_upgrade(args=["--download-dir", str(dl_dir)], chromedriver=False, wrkdir=tmp_path)
+    assert res.returncode != 0
+    assert "Download directory is not writable" in res.stdout

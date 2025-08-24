@@ -2,7 +2,7 @@
 
 set -ue
 
-VERSION="1.4.3"
+VERSION="1.4.4"
 DOWNLOAD_DIR="/tmp"
 DEFAULT_TARGET_DIR="$HOME/.local/bin"
 DRY=0
@@ -21,10 +21,10 @@ Usage: $(basename "$0") [OPTIONS]
 
 Options:
   --dry                     Check if an update is needed, do not install
-  --download-only           Download the archive, but do not install
+  --download-only           Download the archive, but do not install the driver
   --leave-zip-on-failure    Do not delete archive if installation fails
   -t, --target-dir DIR      Directory where chromedriver will be installed
-  -d, --download-dir DIR    Directory where the archivee will be downloaded
+  -d, --download-dir DIR    Directory where the archive will be downloaded
   --chrome VERSION          Use this Chrome version (implies --dry). Can be specified without --chrome
                             If not specified, the version from the installed Chrome will be used
   -a, --apt                 Use the version from apt (implies --dry)
@@ -222,10 +222,14 @@ if [ "$DRY" = 1 ]; then
 fi
 
 # Download driver
+if [ ! -w "$DOWNLOAD_DIR" ]; then
+    echo "Download directory is not writable: $DOWNLOAD_DIR"
+    exit 1
+fi
 ZIP_PATH="$(mktemp -p "$DOWNLOAD_DIR" "chromedriver-${PLATFORM}-${CHROME_VERSION}-XXXXXX.zip")"
 echo "Downloading chromedriver to $ZIP_PATH..."
 
-if ! curl -sL -o "$ZIP_PATH" "$URL" || [ ! -s "$ZIP_PATH" ]; then
+if ! curl -sL -o "$ZIP_PATH" "$URL" || [ ! -s "$ZIP_PATH" ] || ! unzip -t "$ZIP_PATH" ; then
     echo "Failed to download chromedriver"
     exit 1
 fi
