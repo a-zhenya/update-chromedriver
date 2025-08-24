@@ -55,11 +55,16 @@ echo http://example.com/downloads/$VERSION/$PLATFORM/chromedriver.zip
         (self.path / "jq").write_text(script if success else "#!/bin/bash\nexit 0\n")
         (self.path / "jq").chmod(0o755)
 
-    def install_unzip(self, success: bool):
-        script = """#!/bin/bash
+    def install_unzip(self, verify: bool, success: bool):
+        verification_return = "0" if verify else "1"
+        unzip_return = "0" if success else "1"
+        script = f"""#!/bin/bash
 ZIP=""
 while [ $# -gt 0 ]; do
     case "$1" in
+        -t)
+            exit {verification_return}
+            ;;
         -d)
             shift
             DIR="$1"
@@ -75,9 +80,12 @@ while [ $# -gt 0 ]; do
     esac
     shift
 done
+if [ {unzip_return} -ne 0 ]; then
+    exit {unzip_return}
+fi
 cat "$ZIP" > "$DIR/chromedriver"
 """
-        (self.path / "unzip").write_text(script if success else "#!/bin/bash\nexit 1\n")
+        (self.path / "unzip").write_text(script)
         (self.path / "unzip").chmod(0o755)
 
     def mock_apt(self, version):
@@ -85,13 +93,14 @@ cat "$ZIP" > "$DIR/chromedriver"
         (self.path / "apt-get").write_text(f"#!/bin/bash\n{out}\n")
         (self.path / "apt-get").chmod(0o755)
 
-    def install_tools(self, curl_download=True, curl_success=True, jq_success=True, unzip_success=True):
+    def install_tools(self, curl_download=True, curl_success=True, jq_success=True, unzip_verify=True, unzip_success=True):
         self.install_curl(curl_download, curl_success)
         self.install_jq(jq_success)
-        self.install_unzip(unzip_success)
+        self.install_unzip(unzip_verify, unzip_success)
 
 
 def run_upgrade(
+    *,
     args=None,
     env=None,
     chrome=NEW_VERSION,
@@ -102,6 +111,7 @@ def run_upgrade(
     curl_success=True,
     apt_version=NEW_VERSION,
     unzip_success=True,
+    unzip_verify=True,
     wrkdir=".",
 ):
     save_cwd = Path.cwd()
@@ -120,7 +130,8 @@ def run_upgrade(
         mock.install_chromedriver(chromedriver)
     if tools:
         mock.install_tools(
-            curl_download=curl_download, curl_success=curl_success, jq_success=update_found, unzip_success=unzip_success
+            curl_download=curl_download, curl_success=curl_success, jq_success=update_found,
+            unzip_verify=unzip_verify, unzip_success=unzip_success,
         )
     mock.mock_apt(apt_version)
 
@@ -269,10 +280,17 @@ def test_curl_fail(tmp_path, curl_success, curl_download):
     assert "Failed to download" in res.stdout
 
 
-def test_unzip_fail(tmp_path):
-    res, bindir, homedir = run_upgrade(unzip_success=False, chromedriver=False, wrkdir=tmp_path)
+@pytest.mark.parametrize(
+    ["verify", "unzip", "message"],
+    [
+        pytest.param(False, True, "Failed to download", id="Fail on verification"),
+        pytest.param(True, False, "Failed to extract", id="Fail on extraction"),
+    ],
+)
+def test_unzip_fail(tmp_path, verify, unzip, message):
+    res, bindir, homedir = run_upgrade(unzip_verify=verify, unzip_success=unzip, chromedriver=False, wrkdir=tmp_path)
     assert res.returncode != 0
-    assert "Failed to extract" in res.stdout
+    assert message in res.stdout
 
 
 def test_no_chrome(tmp_path):
