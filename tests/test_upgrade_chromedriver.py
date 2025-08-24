@@ -93,7 +93,9 @@ cat "$ZIP" > "$DIR/chromedriver"
         (self.path / "apt-get").write_text(f"#!/bin/bash\n{out}\n")
         (self.path / "apt-get").chmod(0o755)
 
-    def install_tools(self, curl_download=True, curl_success=True, jq_success=True, unzip_verify=True, unzip_success=True):
+    def install_tools(
+        self, curl_download=True, curl_success=True, jq_success=True, unzip_verify=True, unzip_success=True
+    ):
         self.install_curl(curl_download, curl_success)
         self.install_jq(jq_success)
         self.install_unzip(unzip_verify, unzip_success)
@@ -130,8 +132,11 @@ def run_upgrade(
         mock.install_chromedriver(chromedriver)
     if tools:
         mock.install_tools(
-            curl_download=curl_download, curl_success=curl_success, jq_success=update_found,
-            unzip_verify=unzip_verify, unzip_success=unzip_success,
+            curl_download=curl_download,
+            curl_success=curl_success,
+            jq_success=update_found,
+            unzip_verify=unzip_verify,
+            unzip_success=unzip_success,
         )
     mock.mock_apt(apt_version)
 
